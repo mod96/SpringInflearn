@@ -50,12 +50,36 @@ public class JpaMain {
         }
     }
 
+    static void makeDataDDL() {
+        EntityManager em = emf.createEntityManager();
+        // open transaction
+        EntityTransaction tx = em.getTransaction();
+        tx.begin();
+        try {
+            Member member1 = new Member();
+            member1.setRoleType(RoleType.NORMAL);
+            em.persist(member1);
+            System.out.println(member1.getId());
+
+            Member member2 = new Member();
+            member2.setRoleType(RoleType.VIP);
+            em.persist(member2);
+            System.out.println(member2.getId());
+            tx.commit();
+        } catch (Exception e) {
+            tx.rollback();
+        } finally {
+            em.close();
+        }
+    }
+
     public static void main(String[] args) {
 
         emf = Persistence.createEntityManagerFactory("hello");
 
-        makeData();
-        testIdentityComplex();
+        makeDataDDL();
+        makeDataDDL();
+        makeDataDDL();
 
         emf.close();
     }

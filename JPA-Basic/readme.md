@@ -39,7 +39,7 @@ res.forEach(m -> System.out.println(m.getName()));
 
 # Section 3: 영속성 관리
 
-<img width="70%" src="imgs/em_persist.png" />
+<img width="70%" src="imgs/em_persist.PNG" />
 
 - 비영속(new/transient): 영속성 컨텍스트와 관련 없음
 - 영속(managed): 영속성 컨텍스트에 관리되는 상태 (`em.persist(member);`)
@@ -52,19 +52,19 @@ res.forEach(m -> System.out.println(m.getName()));
 em.persist(memberA);
 ```
 
-<img width="70%" src="imgs/em_persist_func.png" />
+<img width="70%" src="imgs/em_persist_func.PNG" />
 
 ```java
 tx.commit(); // this makes em.flush
 ```
 
-<img width="70%" src="imgs/tx_commit_func.png" />
+<img width="70%" src="imgs/tx_commit_func.PNG" />
 
 ```java
 em.flush();
 ```
 
-<img width="70%" src="imgs/em_flush_func.png" />
+<img width="70%" src="imgs/em_flush_func.PNG" />
 
 이에 따라 새로 객체를 만들지 않는 이상(즉, persistence context에서 관리되는 객체라면) `em.persist`를 할 필요가 없다. 쿼리는 다음 3가지 경우에 날라간다.
 - `em.flush();` <= 영속성 컨텍스트를 비우지 않는다.
@@ -164,15 +164,15 @@ create table Member (
 
 왠만하면 `name` 직접 적어놓자. spring boot 관례랑 회사 관례랑 다를 수도 있다.
 
-<img width="70%" src="imgs/column.png" />
+<img width="70%" src="imgs/column.PNG" />
 
 #### @Enumerated
 
-<img width="70%" src="imgs/enumerated.png" />
+<img width="70%" src="imgs/enumerated.PNG" />
 
 #### @Temporal
 
-<img width="70%" src="imgs/temporal.png" />
+<img width="70%" src="imgs/temporal.PNG" />
 
 #### @Lob
 
@@ -214,7 +214,7 @@ public class Member {
 
 `@SequenceGenerator` 의 속성들
 
-<img width="70%" src="imgs/sequence_generator.png" />
+<img width="70%" src="imgs/sequence_generator.PNG" />
 
 만약 `allocationSize=1`인 상태로 여러 새로운 객체들을 `em.persist` 하면 계속 db와 통신하며 sequence값을 받아야 한다. 하지만 `allocationSize=50` 으로 하면 미리 받아와서 쓴다. 50~100 정도가 적절하다.
 
@@ -269,7 +269,7 @@ create table MY_SEQUENCES (
 
 `@TableGenerator` 속성들
 
-<img width="70%" src="imgs/table_generator.png" />
+<img width="70%" src="imgs/table_generator.PNG" />
 
 #### (기본값)AUTO
 방언에 따라 자동 지정
@@ -379,7 +379,7 @@ public class Locker {
 }
 ```
 
-<img width="70%" src="imgs/one_to_one_1.png" />
+<img width="70%" src="imgs/one_to_one_1.PNG" />
 
 
 Locker가 주인인 경우:
@@ -399,7 +399,7 @@ public class Locker {
     private Member member;
 }
 ```
-<img width="70%" src="imgs/one_to_one_2.png" />
+<img width="70%" src="imgs/one_to_one_2.PNG" />
 
 
 

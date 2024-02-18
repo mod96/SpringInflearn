@@ -1,6 +1,8 @@
 package jpashop;
 
 import jakarta.persistence.*;
+import jpashop.domain.Member;
+import jpashop.domain.Order;
 
 public class JpaShopMain {
     static EntityManagerFactory emf;
@@ -10,6 +12,15 @@ public class JpaShopMain {
         EntityTransaction tx = em.getTransaction();
         tx.begin();
         try {
+            Member member1 = new Member();
+            em.persist(member1);
+
+            Order order1 = new Order();
+            order1.changeMember(member1);
+            em.persist(order1);
+
+            System.out.println(member1.getOrders().size()); // 1
+
             tx.commit();
         } catch (Exception e) {
             tx.rollback();

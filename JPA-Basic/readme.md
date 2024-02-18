@@ -186,7 +186,7 @@ create table Member (
 
 ### 기본 키 매핑
 
-직접 할당하려면 `@Id` 만 사용한다. 주로 자동 생성하기에 `@GeneratedValue`를 함께 사용한다. 여기서 `strategy` parameter를 지정한다.
+직접 할당하려면 `@Id` 만 사용한다. 주로 자동 생성하기에 `@GeneratedValue`를 함께 사용한다. 여기서 `strategy` parameter를 지정한다. 아래의 4가지가 있다.
 
 기본 키는 non-null, unique, not be changed 조건을 갖는다. 비즈니스와 연관된 키를 사용하면 변할 확률이 높다. Long + 대체키 + 생성(uuid 등) 전략을 사용하자.
 
@@ -275,8 +275,73 @@ create table MY_SEQUENCES (
 방언에 따라 자동 지정
 
 
+# Section 5: 연관관계 매핑 기초
 
+- 방향(Direction): 단방향, 양방향
+- 다중성(Multiplicity): ManyToOne, OneToMany, OneToOne, ManyToMany
+- 연관관계 주인(Owner)
 
+테이블은 외래 키 조인을 통해 연관을 처리하므로 모든 것이 양방향이다. 
+하지만 객체는 참조를 사용해서 연관을 처리하므로 단방향 매핑만 존재하며 이를 양쪽에서 사용하면 양방향 매핑이 된다. 이 때문에 관계의 주인이 생기게 되며 양방향 매핑은 고려할 게 많기 때문에 지양해야 한다. 
+
+## 단방향 매핑
+
+외래 키를 가진 애가 연관관계의 주인을 갖게 해야 한다. 비즈니스 로직으로 선택하면 안된다.
+
+```java
+public class Order {
+    //    @Column(name = "MEMBER_ID")
+    //    private Long memberId;
+    @ManyToOne
+    @JoinColumn(name = "MEMBER_ID") // column을 써준다.
+    private Member member;
+}
+```
+
+## 양방향 매핑
+
+지양하자. 처음에 설계할 때는 단방향만 하고 JPQL이 복잡해진다면 그 때 추가하자. (양방향은 추가해도 테이블에 영향을 안준다.)
+
+```java
+public class Member {
+    @Id @GeneratedValue @Column(name = "MEMBER_ID")
+    private Long member;
+    @OneToMany(mappedBy = "member") // 상대편의 field를 써준다.
+    private List<Order> orders = new ArrayList<>(); // null ptr exception 방지용
+}
+```
+
+`mappedBy` 를 사용하면 반대쪽에서 관계의 주인이라는 뜻이다. 
+관계의 주인을 제외하고는 읽기만 된다. 단, 객체지향 관점에서 다음과 같은 일이 벌어지지 않도록 하려면:
+
+```java
+Member member1 = new Member();
+em.persist(member1);
+
+Order order1 = new Order();
+order1.setMember(member1);
+em.persist(order1);
+
+System.out.println(member1.getOrders().size()); // 0
+```
+
+`member1` 를 가진 `order1` 을 만들었지만 `member1` 객체의 `orders` 에는 반영되지 않았다. (`setter`는 java 기본 규칙이 적용되는 method 이므로) `change` 라는 편의 method를 정의하자:
+
+```java
+public class Order {
+    public void changeMember(Member member) {
+        // 있던 것 삭제해주는 로직도 필요
+        this.member = member;
+        member.getOrders().add(this);
+    }
+}
+```
+
+편의 메소드 생성 시 무한 루프를 조심하자. (e.g. toString(), lombok, JSON 생성 라이브러리)
+또한 위에서는 관계의 주인인 `order` 에 편의 메소드를 넣었지만, `member` 에 넣을 수도 있다.
+단, 편의 메소드는 한 쪽에만 넣어야 나중에 헷갈리지 않는다. 설계 시 정하고 들어가자.
+
+* 엔티티가 바뀔 것을 대비하여 controller에서는 절대 엔티티를 반환하지 말자. dto 사용하자.
 
 
 

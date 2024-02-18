@@ -344,6 +344,67 @@ public class Order {
 * 엔티티가 바뀔 것을 대비하여 controller에서는 절대 엔티티를 반환하지 말자. dto 사용하자.
 
 
+# Section 6: 연관관계 매핑의 종류
+
+- 다대일: @ManyToOne
+- 일대다: @OneToMany - One 쪽에서 주인을 가지는 모델. 객체 설계시 이렇게 될 수 있으나, 쓰지 마세요
+```java
+public class Member {
+    @OneToMany
+    @JoinColumn(name = "ORDER_ID")
+    private List<Order> orders = new ArrayList<>(); // 이제 주인이 member 다. 업데이트 시 쿼리가 여러 번 나간다.
+}
+```
+- 일대일: @OneToOne - 가끔 쓴다 (방식은 ManyToOne 이랑 같음. db에 unique 조건이 걸린다.)
+
+Member에서 주인을 할지, Locker에서 주인을 할지 결정해야 한다.
+
+Member가 주인인 경우:
+
+Member를 조회했을 때, `locker`가 lazy라면 프록시가 지연로딩을 처리해줘 Locker 테이블을 조회하지 않아도 된다. (값이 있는지 없는지만 볼거면)
+```java
+public class Member {
+    @OneToOne
+    @JoinColumn(name = "LOCKER_ID")
+    private Locker locker;
+}
+```
+```java
+@Entity
+public class Locker {
+    @Id @GeneratedValue @Column(name = "LOCKER_ID")
+    private Long id;
+    @OneToOne(mappedBy = "locker")
+    private Member member;
+}
+```
+
+<img width="70%" src="imgs/one_to_one_1.png" />
+
+
+Locker가 주인인 경우:
+
+Member를 조회했을 때, `locker`가 lazy라고 해도 어차피 Locker 테이블을 조회해야 하므로 항상 즉시 로딩된다.
+```java
+public class Member {
+    @OneToOne(mappedBy = "member")
+    private Locker locker;
+}
+```
+```java
+@Entity
+public class Locker {
+    @OneToOne
+    @JoinColumn(name = "MEMBER_ID")
+    private Member member;
+}
+```
+<img width="70%" src="imgs/one_to_one_2.png" />
+
+
+
+- 다대다: @ManyToMany - 쓰지 마세요
+
 
 
 

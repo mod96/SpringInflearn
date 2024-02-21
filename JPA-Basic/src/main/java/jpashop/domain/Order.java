@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "ORDERS")
 @Data
-public class Order {
+public class Order extends BaseEntity {
     @Id @GeneratedValue @Column(name = "ORDER_ID")
     private Long id;
 //    @Column(name = "MEMBER_ID")

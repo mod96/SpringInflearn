@@ -8,6 +8,8 @@ import java.util.List;
 
 @Entity
 @Data
+@Inheritance(strategy = InheritanceType.JOINED)
+@DiscriminatorColumn(name = "DTYPE")
 public class Item {
     @Id @GeneratedValue @Column(name = "ITEM_ID")
     private Long id;

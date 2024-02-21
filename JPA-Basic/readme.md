@@ -407,6 +407,113 @@ public class Locker {
 
 
 
+# Section 7: 고급 매핑
+
+## 상속관계 매핑
+
+관계형 데이터베이스는 상속 관계가 없다. 
+다만 슈퍼타입 서브타입 관계 모델링 기법이 객체 상속과 유사하다.
+
+<img width="70%" src="imgs/supertype_subtype.PNG" />
+
+이를 구현하는 방법으로 아래의 3가지가 있다.
+
+1. **조인 전략**: 각각 테이블로 변환
+
+장점: 저장공간 효율, 외래 키 제약 활용
+
+단점: 조회시 조인 많이 사용, 저장시 insert 두번
+```java
+@Entity
+@Data
+@Inheritance(strategy = InheritanceType.JOINED)
+@DiscriminatorColumn(name = "DTYPE") // type 맞추기 위한 column
+public class Item {
+    @Id @GeneratedValue @Column(name = "ITEM_ID")
+    private Long id;
+    private String name;
+    private int price;
+}
+```
+```java
+@Entity
+@DiscriminatorValue("Movie") // type 맞추기 위한 column의 value
+public class Movie extends Item {
+    String director;
+    String actor;
+}
+```
+
+<img width="70%" src="imgs/inheritance_joined.PNG" />
+
+2. **단일 테이블 전략**: 통합 테이블로 변환
+
+장점: 조회가 빠르다
+
+단점: 자식 엔티티 컬럼은 nullable. 테이블이 너무 커지면 오히려 느려진다.
+
+```java
+@Inheritance(strategy=InheritanceType.SINGLE_TABLE)
+```
+
+<img width="70%" src="imgs/inheritance_single_table.PNG" />
+
+3. **구현 클래스마다 테이블 전략**: 서브타입 테이블로 변환 -> 쓰지 마세요
+
+discriminator 필요 없음.
+
+```java
+@Inheritance(strategy=InheritanceType.TABLE_PER_CLASS) 
+```
+
+<img width="70%" src="imgs/inheritance_table_per_class.PNG" />
+
+
+## @MappedSuperclass
+
+공통 매핑 정보가 필요할 때 사용함. (id, name, updateDate, createDate 등)
+엔티티가 아니므로 추상 클래스 권장.
+
+```java
+@Data
+@MappedSuperclass
+public abstract class BaseEntity {
+    private String createdBy;
+    private LocalDateTime createdDate;
+    private String lastModifiedBy;
+    private LocalDateTime lastModifiedDate;
+}
+```
+
+```java
+@Entity
+@Table(name = "ORDERS")
+@Data
+public class Order extends BaseEntity {
+    @Id
+    @GeneratedValue
+    @Column(name = "ORDER_ID")
+    private Long id;
+    ...
+}
+```
+hibernate output:
+```sql
+create table ORDERS (
+        DELIVERY_ID bigint unique,
+        MEMBER_ID bigint,
+        ORDER_ID bigint not null,
+        createdDate timestamp(6),                   -- here
+        lastModifiedDate timestamp(6),              -- here
+        orderDate timestamp(6),
+        createdBy varchar(255),                     -- here
+        lastModifiedBy varchar(255),                -- here
+        status varchar(255) check (status in ('ORDER','CANCEL')),
+        primary key (ORDER_ID)
+    )
+```
+
+
 
 
 

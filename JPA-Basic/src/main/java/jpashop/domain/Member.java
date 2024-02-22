@@ -15,9 +15,9 @@ public class Member {
     private String city;
     private String street;
     private String zipcode;
-    @OneToMany(mappedBy = "member")
+    @OneToMany(mappedBy = "member", fetch = FetchType.LAZY)
     private List<Order> orders = new ArrayList<>();
-    @OneToOne
+    @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "LOCKER_ID")
     private Locker locker;
 }

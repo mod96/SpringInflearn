@@ -1,3 +1,36 @@
+목차
+
+Section 2: JPA 시작하기
+- entity manager factory와 entity manager
+
+Section 3: 영속성 관리
+- 영속성 컨텍스트 구조와 동작
+
+Section 4: 엔티티 매핑
+- 엔티티 어노테이션과 기본 필드 어노테이션
+- 기본 키 매핑 전략 4가지(identity, sequence, table, auto)
+
+Section 5: 연관관계 매핑 기초
+- 단방향 매핑
+- 양방향 매핑 (mappedBy)
+
+Section 6: 연관관계 매핑의 종류
+- @ManyToOne
+- @OneToMany
+- @OneToOne
+- @ManyToMany
+
+Section 7: 고급 매핑
+- 상속관계 매핑 3가지 (조인, 단일 테이블, 클래스마다 테이블)
+- @MappedSuperclass
+
+Section 8: 프록시와 연관관계 관리
+- 프록시와 지연로딩
+- CASCADE 와 orphanRemoval
+
+
+
+
 # Section 2: JPA 시작하기
 
 기본 type 과 setting
@@ -516,10 +549,151 @@ create table ORDERS (
 
 
 
+# Section 8: 프록시와 연관관계 관리
+
+## 프록시
+
+`em.find()` 는 실제 엔티티 객체를 조회한다.
+`em.getReference()` 는 프록시 엔티티 객체를 조회한다.
+단, 영속성 컨텍스트에 이미 실제 엔티티 객체가 있으면 그것을 반환한다.
+준 영속일 때 초기화를 시도하면 오류가 난다. (hibernate의 경우 `org.hibernate.LazyInitializationException`)
+프록시는 바이트 조작으로 만들어졌으므로 `instance of` 사용해야 한다.
+
+<img width="70%" src="imgs/proxy.PNG" />
+
+```java
+Hibernate.initialize(order1); // 프록시 강제 초기화
+emf.getPersistenceUnitUtil().isLoaded(order1); // 초기화 여부 확인
+```
+
+## 지연 로딩
+
+```java
+@Entity
+    public class Member {
+        @Id
+        @GeneratedValue
+        private Long id;
+        @Column(name = "USERNAME")
+        private String name;
+        // FetchType.EAGER 는 쓰지 맙시다.
+        @ManyToOne(fetch = FetchType.LAZY) // 단순 Member 조회 시 team join 없음
+        @JoinColumn(name = "TEAM_ID")
+        private Team team;
+}
+```
+이후 `Team team = member.getTeam();` 하면 쿼리가 날라간다. 
+즉시 로딩으로 떡칠되면 순환 오류 잡기 어려우니 필요할 때 JPQL fetch 조인이나, 엔티티 그래프 기능을 사용하자.
+
+## CASCADE
+
+특정 엔티티를 영속 상태로 만들 때 연관된 엔티티도 함께 영속 상태로 만들도 싶을 때 사용한다.
+영속성 전이는 연관관계를 매핑하는 것과 아무 관련이 없다.
+엔티티를 영속화할 때 연관된 엔티티도 함께 영속화하는 편리함을 제공할 뿐이다.
+
+다음의 옵션들이 있지만 앞의 3개를 주로 쓴다.
+
+ALL: 모두 적용 / PERSIST: 영속 / REMOVE: 삭제 / MERGE: 병합 / REFRESH / DETACH
+
+```java
+@Data
+@Entity
+public class Parent {
+    @Id @GeneratedValue @Column(name = "PARENT_ID")
+    private Long id;
+    private String name;
+    @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL)
+    private List<Child> childList = new ArrayList<>();
+
+    public void addChild(Child child) {
+        childList.add(child);
+        child.setParent(this);
+    }
+}
+```
+
+```java
+@Data
+@Entity
+public class Child {
+    @Id
+    @GeneratedValue
+    private Long id;
+    private String name;
+    @ManyToOne
+    @JoinColumn(name = "PARENT_ID")
+    private Parent parent;
+}
+```
+
+```java
+Parent parent = new Parent();
+parent.setName("a");
+em.persist(parent);
+
+Child child1 = new Child();
+child1.setName("c1");
+Child child2 = new Child();
+child2.setName("c2");
+
+parent.addChild(child1);
+parent.addChild(child2);
+
+em.flush();
+em.clear();
+
+Parent parent1 = em.find(Parent.class, parent.getId());
+for (Child child : parent1.getChildList()) {
+    System.out.println(child.getName());
+}
+```
+```bash
+Hibernate: 
+    /* insert for
+        jpashop.domain.cascade.Child */insert 
+    into
+        Child (name, PARENT_ID, id) 
+    values
+        (?, ?, ?)
+Hibernate: 
+    /* insert for
+        jpashop.domain.cascade.Child */insert 
+    into
+        Child (name, PARENT_ID, id) 
+    values
+        (?, ?, ?)
+...
+c1
+c2
+```
 
 
+## orphanRemoval
 
+부모 엔티티와 연관관계가 끊어진 자식 엔티티를 자동으로 삭제한다.
+참조하는 곳이 하나일 때 사용해야한다. 즉, 특정 엔티티가 개인 소유할 때 사용한다.
+@OneToOne, @OneToMany만 가능.
 
+```java
+public class Parent {
+    ...
+    @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Child> childList = new ArrayList<>();
+```
+```java
+parent.getChildList().remove(0);
+```
+```bash
+Hibernate: 
+    /* delete for jpashop.domain.cascade.Child */delete 
+    from
+        Child 
+    where
+        id=?
+```
+
+위와 같이 `CascadeType.ALL` + `orphanRemoval=true` 하면 부모 엔티티를 통해서 자식의 생명 주기를 관리하게 된다.
+DDD의 Aggregate Root 개념을 구현할 때 유용하다.
 
 
 

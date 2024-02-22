@@ -5,6 +5,7 @@ import jpashop.domain.Member;
 import jpashop.domain.Order;
 import jpashop.domain.cascade.Child;
 import jpashop.domain.cascade.Parent;
+import jpashop.domain.embedded.Address;
 import org.hibernate.Hibernate;
 
 public class JpaShopMain {
@@ -15,27 +16,21 @@ public class JpaShopMain {
         EntityTransaction tx = em.getTransaction();
         tx.begin();
         try {
-            Parent parent = new Parent();
-            parent.setName("a");
-            em.persist(parent);
+            Member member1 = new Member();
+            member1.getAddressHistory().add(new Address("city", "street", "zipcode"));
+            member1.getAddressHistory().add(new Address("city", "street", "zipcode"));
 
-            Child child1 = new Child();
-            child1.setName("c1");
-            Child child2 = new Child();
-            child2.setName("c2");
+            Member member2 = new Member();
+            member2.getAddressHistory().add(new Address("city", "street", "zipcode"));
+            member2.getAddressHistory().add(new Address("city", "street", "zipcode"));
 
-            parent.addChild(child1);
-            parent.addChild(child2);
+            em.persist(member1);
+            em.persist(member2);
 
             em.flush();
             em.clear();
 
-            Parent parent1 = em.find(Parent.class, parent.getId());
-            for (Child child : parent1.getChildList()) {
-                System.out.println(child.getName());
-            }
-
-            parent1.getChildList().remove(0);
+            em.find(Member.class, member1.getMember()).getAddressHistory().remove(0);
 
             tx.commit();
         } catch (Exception e) {

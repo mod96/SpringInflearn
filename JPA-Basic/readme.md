@@ -28,7 +28,9 @@ Section 8: 프록시와 연관관계 관리
 - 프록시와 지연로딩
 - CASCADE 와 orphanRemoval
 
-
+Section 9: 값 타입
+- 임베디드 타입
+- 컬렉션 값 타입
 
 
 # Section 2: JPA 시작하기
@@ -697,19 +699,196 @@ DDD의 Aggregate Root 개념을 구현할 때 유용하다.
 
 
 
+# Section 9: 값 타입
+
+객체들은 주소로 관리되며 저장될 때는 값이 읽어져 들어감을 기억하면 된다.
+
+값 타입은 정말 값 타입이라 판단될 때만 사용한다.
+엔티티와 값 타입을 혼동해서 엔티티를 값 타입으로 만들면 안된다.
+식별자가 필요하고, 지속해서 값을 추적, 변경해야 한다면 그것은 값 타입이 아닌 엔티티이다.
+
+JPA의 데이터 타입
+- 엔티티 타입
+- 값 타입
+  - 기본값 타입
+    - 자바 기본 타입: int, double
+    - 래퍼 클래스: Integer, Long
+    - String
+  - 임베디드 타입 (복합)
+  - 컬렉션 값 타입
+
+## 임베디드 타입
+
+객체와 테이블을 아주 세밀하게(find-grained) 매핑하는 것이 가능하다.
+잘 설계한 ORM 애플리케이션은 매핑한 테이블의 수보다 클래스의 수가 더 많다.
+
+<img width="70%" src="imgs/embedded.PNG" />
+
+```java
+@Getter
+@Embeddable
+public class Address {
+    private String city;
+    private String street;
+    private String zipcode;
+}
+```
+
+```java
+@Getter
+@Embeddable
+public class Period {
+    private LocalDateTime startDate;
+    private LocalDateTime endDate;
+}
+```
+
+```java
+public class Member {
+    @Embedded
+    private Period workPeriod;
+    @Embedded
+    @AttributeOverrides({ // 밑의 필드랑 겹치니까 다른걸로 바꿔줌
+            @AttributeOverride(name = "city",
+                    column = @Column(name = "WORK_CITY")
+            ),
+            @AttributeOverride(name = "street",
+                    column = @Column(name = "WORK_STREET")
+            ),
+            @AttributeOverride(name = "zipcode",
+                    column = @Column(name = "WORK_ZIPCODE")
+            )
+    })
+    private Address workAddress;
+
+    private String city;
+    private String street;
+    private String zipcode;
+    ...
+}
+```
+```bash
+create table Member (
+    endDate timestamp(6),
+    startDate timestamp(6),
+    WORK_CITY varchar(255),
+    WORK_STREET varchar(255),
+    WORK_ZIPCODE varchar(255),
+    city varchar(255),
+    street varchar(255),
+    zipcode varchar(255)
+)
+```
+
+참고로 임베디드 타입의 값이 null이면 매핑한 컬럼 값은 모두 null이다.
+
+Integer, String 처럼 객체 타입을 수정할 수 없게 만들면 부작용
+(같은 객체가 여러 곳에서 쓰이다가 누가 값을 바꾼 경우 다른애들도 영향을 받음)
+을 원천 차단할 수 있다. 
+즉, 임베디드 타입은 immutable 로 설계한다. 
+위에 `@Getter` 만 붙은 것을 볼 수 있다. 
+
+동등성 비교를 위해 `equals` 를 정의하는 것이 좋다. (intellij의 generate를 이용하자)
 
 
+## 컬렉션 값 타입
 
+값 타입은 정말 값 타입이라 판단될 때만 사용한다. 왠만하면 일대다 관계를 쓰는게 편해보인다.
+일대다 관계에 Cascade + orphanRemoval 해서 모델링하는게 편할듯.
 
+<img width="70%" src="imgs/collectionType.PNG" />
 
+```java
+@Data
+public class Member {
+    @Id
+    @GeneratedValue
+    @Column(name = "MEMBER_ID")
+    private Long member;
+    ...
+    @ElementCollection
+    @CollectionTable(name = "FAVORITE_FOODS", joinColumns = @JoinColumn(name = "MEMBER_ID")) // 상대 테이블의 정보
+    @Column(name = "FOOD_NAME") // 상대 테이블의 정보
+    private Set<String> favoriteFoods = new HashSet<>();
+    @ElementCollection
+    @CollectionTable(name = "ADDRESS", joinColumns = @JoinColumn(name = "MEMBER_ID")) // 상대 테이블의 정보
+    private List<Address> addressHistory = new ArrayList<>();
+}
+```
+```bash
+Hibernate: 
+    create table FAVORITE_FOODS (
+        MEMBER_ID bigint not null,
+        FOOD_NAME varchar(255)
+    )
+Hibernate: 
+    create table ADDRESS (
+        MEMBER_ID bigint not null,
+        city varchar(255),
+        street varchar(255),
+        zipcode varchar(255)
+    )
+```
+`member` 쪽은 바뀌지 않음. (one to many랑 유사) 
 
+```java
+Member member1 = new Member();
+member1.getFavoriteFoods().add("A");
+member1.getFavoriteFoods().add("B");
 
+Member member2 = new Member();
+member2.getFavoriteFoods().add("A");
+member2.getFavoriteFoods().add("B");
 
+em.persist(member1);
+em.persist(member2);
+```
 
+<img width="30%" src="imgs/collectionType_example.PNG" />
 
+위처럼 저장되는 것을 볼 수 있다. 단, 삭제 및 수정 시 equals 를 잘 정의해 놓아야 한다.
 
+```java
+Member member1 = new Member();
+member1.getAddressHistory().add(new Address("city", "street", "zipcode"));
+member1.getAddressHistory().add(new Address("city", "street", "zipcode"));
 
+Member member2 = new Member();
+member2.getAddressHistory().add(new Address("city", "street", "zipcode"));
+member2.getAddressHistory().add(new Address("city", "street", "zipcode"));
 
+em.persist(member1);
+em.persist(member2);
 
+em.flush();
+em.clear();
+
+em.find(Member.class, member1.getMember()).getAddressHistory().remove(0);
+```
+
+<img width="40%" src="imgs/collectionType_example2.PNG" />
+
+이건 또 뭐냐? 싶은데, 그냥 맞는 애 하나만 지우는듯. 
+아니면 애초에 db 구성할 때 모든 컬럼 묶어서 키로 구성해줘야 하는듯.
+마지막 `remove`부분 쿼리만 보면 다음과 같다.
+
+```bash
+Hibernate: 
+    /* one-shot delete for jpashop.domain.Member.addressHistory */delete 
+    from
+        ADDRESS 
+    where
+        MEMBER_ID=?
+Hibernate: 
+    /* insert for
+        jpashop.domain.Member.addressHistory */insert 
+    into
+        ADDRESS (MEMBER_ID, city, street, zipcode) 
+    values
+        (?, ?, ?, ?)
+```
+
+값 타입 컬렉션에 변경 사항이 발생하면, 주인 엔티티와 연관된 모든 데이터를 삭제하고, 값 타입 컬렉션에 있는 현재 값을 모두 다시 저장한다. 
+`@OrderColumn` 으로 해결할 수 있긴 한데, 굳이굳이다.
 
 

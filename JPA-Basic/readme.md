@@ -32,6 +32,10 @@ Section 9: 값 타입
 - 임베디드 타입
 - 컬렉션 값 타입
 
+Section 10: 객체지향 쿼리 언어1 - 기본 문법
+
+
+Section 11: 객체지향 쿼리 언어2 - 중급 문법
 
 # Section 2: JPA 시작하기
 
@@ -890,5 +894,208 @@ Hibernate:
 
 값 타입 컬렉션에 변경 사항이 발생하면, 주인 엔티티와 연관된 모든 데이터를 삭제하고, 값 타입 컬렉션에 있는 현재 값을 모두 다시 저장한다. 
 `@OrderColumn` 으로 해결할 수 있긴 한데, 굳이굳이다.
+
+
+# Section 10: 객체지향 쿼리 언어1 - 기본 문법
+
+JPQL을 배운다. 근데 spring data jpa, queryDSL 다 이거 기반이라 이걸 이해해야 한다.
+참고로 JPQL, JPA Criteria, QueryDSL, native SQL, JDBC API, MyBatis, SpringJdbcTemplate 이 있다.
+
+JPQL 예시
+```java
+String jpql = "select m from Member m where m.age > 18";
+List<Member> result = em.createQuery(jpql, Member.class).getResultList()
+```
+
+QueryDSL 예시
+```java
+JPAQueryFactory queryFactory = new JPAQueryFactory(em);
+QMember m = QMember.member; // domain.QMember.*
+List<Member> result = queryFactory
+        .select(m)
+        .from(m)
+        .where(m.age.gt(18))
+        .orderBy(m.name.desc())
+        .fetch();
+```
+
+## JPQL 기본 문법
+
+엔티티와 속성은 대소문자 구분이 되며 JPQL 키워드(select, from, where 등)는 대소문자 구분이 안된다.
+별칭은 꼭 사용하자.
+
+<img width="40%" src="imgs/jpql_1.PNG" />
+
+#### 1. 집합과 정렬
+  ```jpql
+  select
+   COUNT(m), //회원수
+   SUM(m.age), //나이 합
+   AVG(m.age), //평균 나이
+   MAX(m.age), //최대 나이
+   MIN(m.age) //최소 나이
+  from Member m
+  where m.location like '%어쩌고%'
+  ```
+
+#### 2. TypeQuery, Query
+
+```java
+TypedQuery<Member> query = em.createQuery("SELECT m FROM Member m", Member.class);
+Query query2 = em.createQuery("SELECT m.username, m.age from Member m");
+// query2 매핑결과는 Object[] 이다. 그냥 순서대로 값 뽑아주는 것.
+```
+
+#### 3. 결과 조회 API
+
+```java
+query.getResultList(); // 결과가 하나 이상일 때, 리스트 반환, 없으면 빈 리스트 반환
+query.getSingleResult(); // 결과가 정확히 하나일 때, 단일 객체 반환
+// 결과가 없으면: javax.persistence.NoResultException
+// 둘 이상이면: javax.persistence.NonUniqueResultException
+```
+
+#### 4. 파라미터 바인딩
+
+```java
+em.createQuery("SELECT m FROM Member m where m.username=:username", Member.class)
+        .setParameter("username", "어쩌고"); // 이름 기준
+        em.createQuery("SELECT m FROM Member m where m.username=?1", Member.class)
+        .setParameter(1, "어쩌고"); // 위치 기준 -> 쓰지말자.
+```
+
+#### 5. 프로젝션
+
+SELECT 절에 조회할 대상을 지정하는 것이다.
+엔티티, 임베디드 타입, 스칼라 타입, dto 조회가 된다.
+
+```jpql
+SELECT m FROM Member m -> 엔티티 프로젝션
+SELECT m.team FROM Member m -> 엔티티 프로젝션
+SELECT m.address FROM Member m -> 임베디드 타입 프로젝션
+SELECT m.username, m.age FROM Member m -> 스칼라 타입 프로젝션 (Object[] 타입)
+SELECT new jpabook.jpql.UserDTO(m.username, m.age) FROM Member m -> dto 프로젝션
+```
+
+#### 6. 페이징
+
+```java
+String jpql = "select m from Member m order by m.name desc";
+List<Member> resultList = em.createQuery(jpql, Member.class)
+        .setFirstResult(10) // 10부터 (idx는 0부터)
+        .setMaxResults(20) // 20개
+        .getResultList();
+```
+
+#### 7. 조인
+
+```jpql
+내부 조인:
+SELECT m FROM Member m [INNER] JOIN m.team t
+외부 조인:
+SELECT m FROM Member m LEFT [OUTER] JOIN m.team t
+세타 조인:
+select count(m) from Member m, Team t where m.username = t.name
+```
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 연관관계 있는 엔티티 조인과 조인 대상 필터링
+```jpql
+JPQL:
+SELECT m, t FROM 
+  Member m LEFT JOIN m.team t on t.name = 'A'
+SQL:
+SELECT m.*, t.* FROM
+  Member m LEFT JOIN Team t ON m.TEAM_ID=t.id and t.name='A'
+```
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 연관관계 없는 엔티티 외부 조인
+```jpql
+JPQL:
+SELECT m, t FROM
+  Member m LEFT JOIN Team t on m.username = t.name
+SQL:
+SELECT m.*, t.* FROM
+  Member m LEFT JOIN Team t ON m.username = t.name
+```
+
+#### 8. 서브 쿼리
+
+```jpql
+나이가 평균보다 많은 회원
+select m from Member m
+  where m.age > (select avg(m2.age) from Member m2)
+
+한 건이라도 주문한 고객
+select m from Member m
+  where (select count(o) from Order o where m = o.member) > 0
+```
+
+(not) exists : 서브쿼리에 결과가 존재하면 참(거짓) - all/any=some
+
+(not) in : 서브쿼리에 하나라도 있으면 참(거짓)
+
+```jpql
+팀A 소속인 회원
+select m from Member m
+  where exists (select t from m.team t where t.name = ‘팀A')
+  
+전체 상품 각각의 재고보다 주문량이 많은 주문들
+select o from Order o
+  where o.orderAmount > ALL (select p.stockAmount from Product p)
+  
+어떤 팀이든 팀에 소속된 회원
+select m from Member m
+  where m.team = ANY (select t from Team t)
+```
+
+#### 9. 타입 표현과 기타식
+
+- 문자: ‘HELLO’, ‘She’’s’
+- 숫자: 10L(Long), 10D(Double), 10F(Float)
+- Boolean: TRUE, FALSE
+- ENUM: jpabook.MemberType.Admin (패키지명 포함)
+- 엔티티 타입: TYPE(m) = Member (상속 관계에서 사용)
+- AND, OR, NOT
+- =, >, >=, <, <=, <>
+- BETWEEN, LIKE, IS NULL
+
+#### 10. CASE
+
+```jpql
+select
+    case when m.age <= 10 then '학생요금'
+         when m.age >= 60 then '경로요금'
+         else '일반요금'
+    end
+from Member m
+
+// COALESCE: 하나씩 조회해서 null이 아니면 반환
+사용자 이름이 없으면 이름 없는 회원을 반환
+select coalesce(m.username,'이름 없는 회원') from Member m
+
+// NULLIF: 두 값이 같으면 null 반환, 다르면 첫번째 값 반환
+사용자 이름이 ‘관리자’면 null을 반환하고 나머지는 본인의 이름을 반환
+select NULLIF(m.username, '관리자') from Member m
+```
+
+#### 11. JPQL 함수
+
+- CONCAT
+- SUBSTRING
+- TRIM
+- LOWER, UPPER
+- LENGTH
+- LOCATE
+- ABS, SQRT, MOD
+- SIZE, INDEX(JPA 용도)
+- 이외의 db specific function을 위해서는 방언에 추가해야 한다. (상속받고 추가하면 됨)
+
+
+
+
+
+
+
+
 
 

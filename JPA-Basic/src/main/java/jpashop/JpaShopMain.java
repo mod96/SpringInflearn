@@ -16,21 +16,7 @@ public class JpaShopMain {
         EntityTransaction tx = em.getTransaction();
         tx.begin();
         try {
-            Member member1 = new Member();
-            member1.getAddressHistory().add(new Address("city", "street", "zipcode"));
-            member1.getAddressHistory().add(new Address("city", "street", "zipcode"));
-
-            Member member2 = new Member();
-            member2.getAddressHistory().add(new Address("city", "street", "zipcode"));
-            member2.getAddressHistory().add(new Address("city", "street", "zipcode"));
-
-            em.persist(member1);
-            em.persist(member2);
-
-            em.flush();
-            em.clear();
-
-            em.find(Member.class, member1.getMember()).getAddressHistory().remove(0);
+            em.createQuery("SELECT m FROM Member m where m.username=?1", Member.class).setParameter(1, "어쩌고");
 
             tx.commit();
         } catch (Exception e) {

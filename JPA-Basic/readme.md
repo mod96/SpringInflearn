@@ -33,9 +33,13 @@ Section 9: 값 타입
 - 컬렉션 값 타입
 
 Section 10: 객체지향 쿼리 언어1 - 기본 문법
-
+- 집합/정렬/조회/파라미터바인딩/프로젝션/페이징/조인/서브쿼리/case/함수
 
 Section 11: 객체지향 쿼리 언어2 - 중급 문법
+- 경로 표현식
+- 패치 조인과 중복제거
+- 다형성 쿼리
+- 벌크 연산
 
 # Section 2: JPA 시작하기
 
@@ -1092,10 +1096,133 @@ select NULLIF(m.username, '관리자') from Member m
 
 
 
+# Section 11: 객체지향 쿼리 언어2 - 중급 문법
+
+## 경로 표현식
+
+명시적 조인을 사용하자. 묵시적 조인은 inner join이다. 명시적 조인으로 해놔야 후에 튜닝하기 쉽다.
+
+```jpql
+select m.username -> 상태 필드 (탐색의 끝)
+ from Member m
+ join m.team t -> 단일 값 연관 필드 (추가 탐색 가능)
+ join m.orders o -> 컬렉션 값 연관 필드 (별칭 이용해야 추가 탐색 가능)
+where t.name = '팀A' 
+```
+```jpql
+select o.member.team from Order o -> 성공
+select t.members from Team -> 성공
+select t.members.username from Team t -> 실패
+select m.username from Team t join t.members m -> 성공
+```
+
+## 패치 조인과 중복제거
+
+연관된 엔티티나 컬렉션을 SQL 한 번에 함께 조회하는 기능이다.
+LAZY 연관관계를 미리 한번에 땡겨오는 것.
+
+패치 조인에 별칭을 주지 말자.
+페이징 사용이 안된다.
+결과가 dto라면 패치 조인을 사용할 곳이 아니다.
+
+그냥 join 하면 부르지 않은 것은 안불러진다.
+```java
+em.createQuery("SELECT m FROM Member m join m.team", Member.class).getResultList();
+```
+```sql
+select
+    m1_0.MEMBER_ID,
+    m1_0.city,
+    ... (team_id 빼고 다)
+from
+    Member m1_0 
+join
+    Team t1_0 
+        on t1_0.TEAM_ID=m1_0.TEAM_ID
+```
+fetch join 시 미리 persistence context 에 넣어놓는다. (lazy 객체에 대한 n+1 방지)
+```java
+em.createQuery("SELECT m FROM Member m join fetch m.team", Member.class).getResultList();
+```
+```sql
+select
+    m1_0.MEMBER_ID,
+    m1_0.city,
+    ...
+    t1_0.TEAM_ID,
+    t1_0.name
+from
+    Member m1_0 
+join
+    Team t1_0 
+        on t1_0.TEAM_ID=m1_0.TEAM_ID
+```
+하이버네이트 6 부터는 DISTINCT 명령어를 사용하지 않아도 애플리케이션에서 자동으로 중복을 제거해준다. 
+이를테면 팀A에 멤버 1, 2가 속한 경우 다음의 쿼리는 2개 행을 반환해야 한다.
+```sql
+select
+    t.*,
+    m.*
+from
+    Team t
+join
+    Member m
+        on t.TEAM_ID=m.TEAM_ID 
+where
+    t.name='팀A'
+```
+```bash
+TEAM_ID MEMBER_ID  
+1	1
+1	2
+```
+근데 아래와 같은 코드에서 결과는 하나 뿐이다.
+```java
+String jpql = "select t from Team t join fetch t.members where t.name = '팀A'";
+List<Team> teams = em.createQuery(jpql, Team.class).getResultList();
+for(Team team : teams) {
+    System.out.println("teamname = " + team.getName() + ", team = " + team);
+    for (Member member : team.getMembers()) {
+        //페치 조인으로 팀과 회원을 함께 조회해서 지연 로딩 발생 안함
+        System.out.println("-> username = " + member.getName()+ ", member = " + member);
+    }
+}
+```
+```bash
+teamname = 팀A, team = jpashop.domain.Team@45c408a4
+-> username = 회원1, member = jpashop.domain.Member@7a3a49e5
+-> username = 회원2, member = jpashop.domain.Member@75ee6f89
+```
+즉, 애플리케이션이 자동으로 중복을 제거해주는 것이다.
 
 
+## 다형성 쿼리
 
+상속 관계에서 자식을 특정할 때 사용한다.
+```jpql
+// Item 중에 Book, Movie를 조회해라
+select i from Item i where type(i) IN (Book, Movie)
 
+// 타입 캐스팅 억지 예시
+select i from Item i where treat(i as Book).author = ‘kim’
+```
 
+## 벌크 연산
+
+UPDATE, DELETE 쿼리에 관한 것이다.
+우선 `em.flush()` 가 수행된 후 쿼리가 나간다. 
+이후 영속성 컨텍스트는 업데이트가 안되기 때문에 벌크 연산 수행 후 반드시 `em.clear()` 해주자.
+
+```java
+createTeamMembers(em);
+em.createQuery("update Member m set m.name = 'bulkTest' where m.name like '회원%'").executeUpdate();
+for (Member member : em.createQuery("select m from Member m", Member.class).getResultList()) {
+    System.out.println(member.getName()); // 여전히 회원1~4 가 뜬다.
+}
+em.clear();
+for (Member member : em.createQuery("select m from Member m", Member.class).getResultList()) {
+    System.out.println(member.getName()); // 업데이트 된게 뜬다.
+}
+```
 
 

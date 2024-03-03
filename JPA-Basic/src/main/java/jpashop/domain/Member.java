@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import jpashop.domain.embedded.Address;
 import jpashop.domain.embedded.Period;
 import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -11,7 +13,8 @@ import java.util.List;
 import java.util.Set;
 
 @Entity
-@Data
+@Getter
+@Setter
 public class Member {
     @Id
     @GeneratedValue
@@ -50,4 +53,8 @@ public class Member {
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "ADDRESS", joinColumns = @JoinColumn(name = "MEMBER_ID")) // 상대 테이블의 정보
     private List<Address> addressHistory = new ArrayList<>();
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "TEAM_ID")
+    private Team team;
 }
